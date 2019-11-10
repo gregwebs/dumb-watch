@@ -14,6 +14,7 @@ install:
 	arduino-cli core install TinyCircuits:samd --additional-urls https://tiny-circuits.com/Downloads/ArduinoBoards/package_tinycircuits_index.json
 	arduino-cli lib install RTCZero
 	arduino-cli lib install TinyScreen
+	arduino-cli lib install "Arduino Low Power"
 
 # microcom to read output
 # There are other options listed here, but they dpn't seem better

@@ -10,7 +10,9 @@ uint32_t startTime = 0;
 uint32_t sleepTime = 0;
 
 void wakeHandler() {
-  SerialMonitorInterface.println("wake up!");
+  println("wake up!");
+  display.on();
+  hardwareDrawCommands();
   if (sleepTime) {
     millisOffsetCount += (RTCZ.getEpoch() - sleepTime);
     sleepTime = 0;
@@ -22,6 +24,7 @@ void RTCwakeHandler() {
 }
 
 void watchSleep() {
+  // SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
   // if (doVibrate) return;
   sleepTime = RTCZ.getEpoch();
   RTCZ.standbyMode();
@@ -53,10 +56,6 @@ void setup_display() {
   // These are buttons?
   // pinMode(31, INPUT_PULLUP);
   // pinMode(32, INPUT_PULLUP);
-  pinMode(TSP_PIN_BT1, INPUT_PULLUP);
-  pinMode(TSP_PIN_BT2, INPUT_PULLUP);
-  pinMode(TSP_PIN_BT3, INPUT_PULLUP);
-  pinMode(TSP_PIN_BT4, INPUT_PULLUP);
 
   pinMode(42, INPUT_PULLUP);
   pinMode(44, INPUT_PULLUP);
@@ -64,22 +63,19 @@ void setup_display() {
   pinMode(A4, INPUT);
   pinMode(2, INPUT);
 
-  // Originally was FALLING
-  attachInterrupt(TSP_PIN_BT1, wakeHandler, FALLING);
-  attachInterrupt(TSP_PIN_BT2, wakeHandler, FALLING);
-  attachInterrupt(TSP_PIN_BT3, wakeHandler, FALLING);
-  attachInterrupt(TSP_PIN_BT4, wakeHandler, FALLING);
+  RTCZ.begin();
+  RTCZ.setTime(20, 15, 1);//h,m,s
+  //RTCZ.setDate(25, 7, 19);//d,m,y
 
   // pinMode(vibratePin, OUTPUT);
   // digitalWrite(vibratePin, vibratePinInactive);
 
-  RTCZ.begin();
-  RTCZ.setTime(16, 15, 1);//h,m,s
-  //RTCZ.setDate(25, 7, 19);//d,m,y
   display.begin();
   display.setFlip(true);
   // 0-15
   display.setBrightness(10);
+  pinMode(vibratePin, OUTPUT);
+  digitalWrite(vibratePin, vibratePinInactive);
   initHomeScreen();
 
   // https://github.com/arduino/ArduinoCore-samd/issues/142
@@ -88,6 +84,28 @@ void setup_display() {
   // and we'll use that for the EIC. Increases power consumption by ~50uA
   GCLK->CLKCTRL.reg = uint16_t(GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK2 | GCLK_CLKCTRL_ID( GCLK_CLKCTRL_ID_EIC_Val ) );
   while (GCLK->STATUS.bit.SYNCBUSY) {}
+
+/*
+  pinMode(TSP_PIN_BT1, INPUT_PULLUP);
+  pinMode(TSP_PIN_BT2, INPUT_PULLUP);
+  pinMode(TSP_PIN_BT3, INPUT_PULLUP);
+  pinMode(TSP_PIN_BT4, INPUT_PULLUP);
+
+  attachInterrupt(TSP_PIN_BT1, wakeHandler, FALLING);
+  attachInterrupt(TSP_PIN_BT2, wakeHandler, FALLING);
+  attachInterrupt(TSP_PIN_BT3, wakeHandler, FALLING);
+  attachInterrupt(TSP_PIN_BT4, wakeHandler, FALLING);
+
+  pinMode(37, INPUT_PULLUP);
+  attachInterrupt(37, wakeHandler, FALLING);
+  pinMode(38, INPUT_PULLUP);
+  attachInterrupt(38, wakeHandler, FALLING);
+  pinMode(47, INPUT_PULLUP);
+  attachInterrupt(47, wakeHandler, FALLING);
+  pinMode(48, INPUT_PULLUP);
+  attachInterrupt(48, wakeHandler, FALLING);
+  */
+
 }
 
 void fillScreen() {
@@ -104,6 +122,10 @@ void initHomeScreen() {
   updateMainDisplay();
 }
 
+void println(const String arg) {
+  // SerialMonitorInterface.println(arg);
+}
+
 unsigned long sleepTimer = 0;
 int sleepTimeout = 5;
 uint8_t displayOn = 1;
@@ -113,18 +135,18 @@ void loop_display(struct AccelResult *accelResult){
 
   if (millisOffset() > sleepTimer + ((unsigned long)sleepTimeout*1000ul)) {
     if (displayOn) {
-      SerialMonitorInterface.println("display off");
+      println("display off");
       displayOn = 0;
       display.off();
     }
-    // watchSleep();
+    watchSleep();
   }
 }
 
 uint8_t buttonReleased = 1;
 
 int requestScreenOn() {
-    SerialMonitorInterface.println("request screen on!");
+    println("request screen on!");
   sleepTimer = millisOffset();
   if (!displayOn) {
     updateMainDisplay();
@@ -144,20 +166,20 @@ void checkButtons() {
   //char data[3];
   //sprintf(data, "%d", result);
   if (display.getButtons(TSButtonUpperLeft) && display.getButtons(TSButtonUpperRight)) {
-    SerialMonitorInterface.println("double press!");
+    println("double press!");
     newDisplayState = displayStateSetTime;
     buttonReleased = 1;
     buttonPress(buttons);
     return;
   }
   if (buttonReleased && buttons) {
-    SerialMonitorInterface.println("Pressed!");
+    println("Pressed!");
     if (displayOn) buttonPress(buttons);
     requestScreenOn();
     buttonReleased = 0;
   }
   if (!buttonReleased && !(buttons & 0x0F)) {
-    SerialMonitorInterface.println("buttons released");
+    println("buttons released");
     buttonReleased = 1;
   }
 }
@@ -204,7 +226,7 @@ void buttonPress(uint8_t buttons) {
   updateMainDisplay();
   if (currentDisplayState == displayStateHome) {
     if (newDisplayState == displayStateSetTime) {
-      SerialMonitorInterface.println("Setting Time!");
+      println("Setting Time!");
   timeSettingPosition++;
   timeSettingPosition = timeSettingPosition % 3;
         displaySetTime(0x0);
@@ -225,7 +247,7 @@ unsigned long lastMainDisplayUpdate = 0;
 uint8_t lastSetBrightness = 100;
 int brightness = 3;
 void updateMainDisplay() {
-      SerialMonitorInterface.println("update display");
+      println("update display");
   updateTimeDisplay();
   displayBattery();
   lastMainDisplayUpdate = millisOffset();
@@ -241,10 +263,10 @@ uint32_t millisOffset() {
 
 void writeColon() {
   if (!blink_colon) {
-      SerialMonitorInterface.println("colon");
+      println("colon");
     display.write(' ');
   } else {
-      SerialMonitorInterface.println("space");
+      println("space");
     display.write(':');
   }
 }

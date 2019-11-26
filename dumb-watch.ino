@@ -22,7 +22,7 @@
 #endif
 
 void setup() {
-  SerialMonitorInterface.begin(115200);
+  // SerialMonitorInterface.begin(115200);
   Wire.begin();
   //setup_accel();
   setup_display();
